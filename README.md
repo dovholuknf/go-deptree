@@ -10,6 +10,7 @@ There are three simple flags you can pass:
 * maxDepth - how deeply to recurse into the deps. defaults to max int
 * verbose - just a few extra lines of output
 * version - prints the version and exits
+* includeVersion - adds the version of the dependency to the tree. defaults to false
 
 For example, running `go run main.go` on this project renders no dependencies other than go itself:
 

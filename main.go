@@ -12,6 +12,7 @@ import (
 )
 
 var verbose = false
+var includeVersion = false
 var rendered = make(map[string]string)
 var nodes = make(map[string]*Node)
 
@@ -26,6 +27,7 @@ func main() {
 	var versionFlag = false
 	flag.BoolVar(&versionFlag, "version", false, "Print the version")
 	flag.BoolVar(&verbose, "verbose", false, "Print additional output")
+	flag.BoolVar(&verbose, "includeVersion", false, "Prints the version of the dependency too")
 	flag.Parse()
 
 	if versionFlag {
@@ -74,7 +76,12 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 		}
 
 		parent := fields[0]
-		child := fields[1]
+		child := ""
+		if includeVersion {
+			child = fields[1]
+		} else {
+			child = strings.Split(fields[1], "@")[0]
+		}
 
 		// Create nodes if they don't exist
 		if _, ok := nodes[parent]; !ok {
