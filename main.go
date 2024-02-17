@@ -2,6 +2,7 @@ package main
 
 import (
 	"bufio"
+	"flag"
 	"fmt"
 	"os"
 	"os/exec"
@@ -14,6 +15,25 @@ type Node struct {
 }
 
 func main() {
+	// Define a maxDepth flag with a default value of 0
+	maxDepth := flag.Int("maxDepth", 1, "Maximum depth for processing")
+
+	// Parse the command-line arguments
+	flag.Parse()
+
+	// Access the value of the maxDepth flag
+	depth := *maxDepth
+
+	// Validate the value (optional)
+	if depth < 0 {
+		fmt.Println("Error: maxDepth must be a non-negative integer.")
+		return
+	}
+
+	// Your program logic goes here, using the 'depth' variable
+
+	// Example: Print the maxDepth value
+	fmt.Printf("Processing with maxDepth: %d\n", depth)
 	executeGoModGraph()
 	filePath := "./go-mod-graph.txt"
 	seedNode, err := processFile(filePath, getCurrentModuleName())
@@ -22,7 +42,7 @@ func main() {
 		return
 	}
 
-	printNodeWithIndentation(seedNode, "", "", 1, 1)
+	printNodeWithIndentation(*maxDepth, 1, seedNode, "", "", 1, 1)
 }
 
 func processFile(filePath string, seedValue string) (*Node, error) {
@@ -80,7 +100,7 @@ func isChildLinked(parent *Node, child *Node) bool {
 	return false
 }
 
-func printNodeWithIndentation(node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
+func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
 	fmt.Printf("%s%s%s\n", childIndent, nodeIndent, node.Value)
 	childLen := len(node.Children)
 
@@ -89,13 +109,15 @@ func printNodeWithIndentation(node *Node, nodeIndent, childIndent string, positi
 	} else {
 		childIndent += "│   "
 	}
-	for i, child := range node.Children {
-		if i == childLen-1 {
-			nodeIndent = "└── "
-		} else {
-			nodeIndent = "├── "
+	if maxDepth > depth {
+		for i, child := range node.Children {
+			if i == childLen-1 {
+				nodeIndent = "└── "
+			} else {
+				nodeIndent = "├── "
+			}
+			printNodeWithIndentation(maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
 		}
-		printNodeWithIndentation(child, nodeIndent, childIndent, i+1, childLen)
 	}
 }
 func executeGoModGraph() {
