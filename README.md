@@ -14,3 +14,6 @@ github.com/dovholuknf/deptree
     └── go@1.21.5
         └── toolchain@go1.21.5
 ```
+
+## Installing
+Installation is easy. Just run `go install github.com/dovholuknf/go-deptree@latest`
