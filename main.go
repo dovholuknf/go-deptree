@@ -4,12 +4,14 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"math"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
 )
 
+var verbose = false
 var rendered = make(map[string]string)
 var nodes = make(map[string]*Node)
 
@@ -20,9 +22,10 @@ type Node struct {
 }
 
 func main() {
-	maxDepth := flag.Int("maxDepth", 1, "Maximum depth for processing")
-	var versionFlag = false //:= flag.Bool("version", false, "Prints the version")
+	maxDepth := flag.Int("maxDepth", math.MaxInt, "Maximum depth for processing")
+	var versionFlag = false
 	flag.BoolVar(&versionFlag, "version", false, "Print the version")
+	flag.BoolVar(&verbose, "verbose", false, "Print additional output")
 	flag.Parse()
 
 	if versionFlag {
@@ -36,7 +39,9 @@ func main() {
 		fmt.Println("maxDepth cannot be < 1, using 1 for maxDepth")
 		depth = 1
 	}
-	fmt.Printf("Processing with maxDepth: %d\n", depth)
+	if depth < math.MaxInt || verbose {
+		fmt.Printf("Processing with maxDepth: %d\n", depth)
+	}
 	executeGoModGraph()
 	filePath := "./go-mod-graph.txt"
 	seedNode, err := processFile(filePath, getCurrentModuleName())
@@ -164,7 +169,9 @@ func executeGoModGraph() {
 		return
 	}
 
-	fmt.Printf("Output of go mod graph written to: ./go-mod-graph.txt\n\n")
+	if verbose {
+		fmt.Printf("Output of go mod graph written to: ./go-mod-graph.txt\n\n")
+	}
 }
 
 func getCurrentModuleName() string {
