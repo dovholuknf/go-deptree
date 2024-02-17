@@ -102,8 +102,12 @@ func isChildLinked(parent *Node, child *Node) bool {
 }
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
-	fmt.Printf("%s%s%s\n", childIndent, nodeIndent, node.Value)
 	childLen := len(node.Children)
+
+	fmt.Print("%s%s%s", childIndent, nodeIndent, node.Value)
+	if strings.HasPrefix(node.Value, "golang.org") {
+		fmt.Printf(" <skipping %d children from golang.org>\n", childLen)
+	}
 
 	if position == totalNodes {
 		childIndent += "    "
