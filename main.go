@@ -5,6 +5,7 @@ import (
 	"flag"
 	"fmt"
 	"github.com/stretchr/testify/assert"
+	"log"
 	"math"
 	"os"
 	"os/exec"
@@ -13,7 +14,7 @@ import (
 	"testing"
 )
 
-const ver = "1.0.5"
+const ver = "1.0.6"
 
 func TestSomething(t *testing.T) {
 
@@ -25,12 +26,15 @@ var verbose = false
 var includeVersion = false
 var hideSkipReason = false
 var rendered = make(map[string]string)
-var nodes = make(map[string]*Node)
+var directDeps = make(map[string]bool)
+
+//var indirectDeps = make(map[string]bool)
 
 type Node struct {
 	Value    string
 	Children []*Node
 	Parent   string
+	Indirect bool
 }
 
 func (n *Node) Val() string {
@@ -65,18 +69,24 @@ func main() {
 	if depth < math.MaxInt || verbose {
 		fmt.Printf("Processing with maxDepth: %d\n", depth)
 	}
+
+	goModFile := "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go.mod"
+	processGoMod(goModFile)
+
 	executeGoModGraph()
-	filePath := "./go-mod-graph.txt"
-	seedNode, err := processFile(filePath, getCurrentModuleName())
+	filePath := "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go-mod-graph.txt"
+	seedNode, err := processFile(filePath) // getCurrentModuleName())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
 
+	fmt.Println(directDeps) //, indirectDeps)
+
 	printNodeWithIndentation(depth, 1, seedNode, "", "", 1, 1)
 }
 
-func processFile(filePath string, seedValue string) (*Node, error) {
+func processFile(filePath string) (*Node, error) {
 	file, err := os.Open(filePath)
 	if err != nil {
 		return nil, err
@@ -84,9 +94,9 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 	defer func() { _ = file.Close() }()
 
 	// Create the seed node
-	seedNode := &Node{Value: seedValue}
-	nodes[seedValue] = seedNode
+	seedNode := &Node{}
 
+	var nodes = make(map[string]*Node)
 	scanner := bufio.NewScanner(file)
 	for scanner.Scan() {
 		line := scanner.Text()
@@ -99,6 +109,11 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 		parent := fields[0]
 		child := fields[1]
 
+		if seedNode.Value == "" {
+			seedNode.Value = parent
+			nodes[parent] = seedNode
+		}
+
 		// Create nodes if they don't exist
 		if _, ok := nodes[parent]; !ok {
 			nodes[parent] = &Node{Value: parent}
@@ -108,8 +123,19 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 		}
 
 		// Link child node to the parent only if it's not already linked
-		if !isChildLinked(nodes[parent], nodes[child]) {
-			nodes[parent].Children = append(nodes[parent].Children, nodes[child])
+		pn := nodes[parent]
+		cn := nodes[child]
+		if !isChildLinked(pn, cn) {
+			if pn == seedNode {
+				in := directDeps[cn.Value]
+				if in {
+					//nodes[parent].Children = append(pn.Children, cn)
+				} else {
+					nodes[parent].Children = append(pn.Children, cn)
+				}
+			} else {
+				nodes[parent].Children = append(pn.Children, cn)
+			}
 		}
 	}
 
@@ -131,8 +157,10 @@ func isChildLinked(parent *Node, child *Node) bool {
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
 	done := rendered[node.Val()]
-	if done != "" && !hideSkipReason {
-		fmt.Printf("%s%s%s <skipping -- already processed under: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
+	if done != "" {
+		if !hideSkipReason {
+			fmt.Printf("%s%s%s <skipping -- already processed under: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
+		}
 		return
 	}
 	rendered[node.Val()] = node.Val()
@@ -140,11 +168,12 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 
 	fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
 	if strings.HasPrefix(node.Val(), "golang.org") || strings.HasPrefix(node.Val(), "toolchain") {
-		if childLen > 0 && !hideSkipReason {
-			fmt.Printf(" <skipping %d children>\n", childLen)
-		} else {
-			fmt.Println()
+		if childLen > 0 {
+			if !hideSkipReason {
+				fmt.Printf(" <skipping %d children>\n", childLen)
+			}
 		}
+		fmt.Println()
 		return
 	} else {
 		fmt.Println()
@@ -197,20 +226,40 @@ func executeGoModGraph() {
 	}
 }
 
-func getCurrentModuleName() string {
-	cmd := exec.Command("go", "list", "-m")
-	output, err := cmd.Output()
-	if err != nil {
-		return ""
-	}
-
-	// Convert the output to a string and trim any whitespace
-	moduleName := strings.TrimSpace(string(output))
-	return moduleName
-}
 func caseInsensitiveCompare(a, b string) bool {
 	aLower := strings.ToLower(a)
 	bLower := strings.ToLower(b)
 
 	return aLower < bLower
+}
+
+func processGoMod(file string) {
+	f, err := os.Open(file)
+	if err != nil {
+		log.Fatalln(err)
+	}
+	defer func() { _ = f.Close() }()
+
+	scanner := bufio.NewScanner(f)
+	for scanner.Scan() {
+		line := strings.TrimSpace(scanner.Text())
+
+		parts := strings.Split(line, " ")
+		if len(parts) < 2 || strings.HasPrefix(line, "//") || line == "" {
+			continue
+		}
+
+		// Check if the line is an indirect dependency
+		if strings.Contains(line, "// indirect") {
+			directDeps[parts[0]+"@"+parts[1]] = true
+		} else {
+			directDeps[parts[0]+"@"+parts[1]] = false
+		}
+	}
+
+	if err := scanner.Err(); err != nil {
+		log.Fatalln(err)
+	}
+
+	return
 }
