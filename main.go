@@ -39,7 +39,7 @@ func main() {
 	flag.Parse()
 
 	if versionFlag {
-		fmt.Println("1.0.3")
+		fmt.Println("1.0.4")
 		return
 	}
 
@@ -68,7 +68,7 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	// Create the seed node
 	seedNode := &Node{Value: seedValue}
@@ -91,7 +91,7 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 			nodes[parent] = &Node{Value: parent}
 		}
 		if _, ok := nodes[child]; !ok {
-			nodes[child] = &Node{Value: child, Parent: parent}
+			nodes[child] = &Node{Value: child, Parent: nodes[parent].Val()}
 		}
 
 		// Link child node to the parent only if it's not already linked
@@ -119,7 +119,7 @@ func isChildLinked(parent *Node, child *Node) bool {
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
 	done := rendered[node.Val()]
 	if done != "" {
-		fmt.Printf("%s%s%s <skipping -- previously rendered under node: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
+		fmt.Printf("%s%s%s <skipping -- already processed under: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
 		return
 	}
 	rendered[node.Val()] = node.Val()
@@ -167,7 +167,7 @@ func executeGoModGraph() {
 		fmt.Println("Error creating output file:", err)
 		return
 	}
-	defer outputFile.Close()
+	defer func() { _ = outputFile.Close() }()
 
 	// Set the output of the command to the file
 	cmd.Stdout = outputFile
