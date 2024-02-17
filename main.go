@@ -31,8 +31,8 @@ func main() {
 	}
 	fmt.Printf("Processing with maxDepth: %d\n", depth)
 	executeGoModGraph()
-	filePath := "/tmp/a.txt" //filePath := "./go-mod-graph.txt"
-	seedNode, err := processFile(filePath, "github.com/openziti/sdk-golang" /*getCurrentModuleName()*/)
+	filePath := "./go-mod-graph.txt"
+	seedNode, err := processFile(filePath, getCurrentModuleName())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
