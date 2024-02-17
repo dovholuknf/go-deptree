@@ -21,7 +21,14 @@ type Node struct {
 
 func main() {
 	maxDepth := flag.Int("maxDepth", 1, "Maximum depth for processing")
+	var versionFlag = false //:= flag.Bool("version", false, "Prints the version")
+	flag.BoolVar(&versionFlag, "version", false, "Print the version")
 	flag.Parse()
+
+	if versionFlag {
+		fmt.Println("1.0")
+		return
+	}
 
 	depth := *maxDepth
 
