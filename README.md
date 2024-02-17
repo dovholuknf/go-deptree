@@ -6,11 +6,12 @@ It will run `go mod graph` and send the output to `go-mod-graph.txt`. The output
 and rendered as a tree view. The output also excludes dependencies from `golang.org` and `toolchain`. There's no way to
 change this behavior at this time.
 
-There are three simple flags you can pass:
+There are a few flags you can pass:
 * maxDepth - how deeply to recurse into the deps. defaults to max int
 * verbose - just a few extra lines of output
 * version - prints the version and exits
 * includeVersion - adds the version of the dependency to the tree. defaults to false
+* hideSkipReason - suppresses the reason child dependencies are not processed
 
 For example, running `go run main.go` on this project renders no dependencies other than go itself:
 

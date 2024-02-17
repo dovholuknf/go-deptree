@@ -4,15 +4,26 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"github.com/stretchr/testify/assert"
 	"math"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
+	"testing"
 )
+
+const ver = "1.0.5"
+
+func TestSomething(t *testing.T) {
+
+	// assert equality
+	assert.Equal(t, 123, 123, "they should be equal")
+}
 
 var verbose = false
 var includeVersion = false
+var hideSkipReason = false
 var rendered = make(map[string]string)
 var nodes = make(map[string]*Node)
 
@@ -35,11 +46,13 @@ func main() {
 	var versionFlag = false
 	flag.BoolVar(&versionFlag, "version", false, "Print the version")
 	flag.BoolVar(&verbose, "verbose", false, "Print additional output")
+	flag.BoolVar(&hideSkipReason, "hideSkipReason", false, "Suppresses the reason for skipping child dependencies")
+
 	flag.BoolVar(&includeVersion, "includeVersion", false, "Prints the version of the dependency too")
 	flag.Parse()
 
 	if versionFlag {
-		fmt.Println("1.0.4")
+		fmt.Println(ver)
 		return
 	}
 
@@ -118,7 +131,7 @@ func isChildLinked(parent *Node, child *Node) bool {
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
 	done := rendered[node.Val()]
-	if done != "" {
+	if done != "" && !hideSkipReason {
 		fmt.Printf("%s%s%s <skipping -- already processed under: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
 		return
 	}
@@ -127,7 +140,7 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 
 	fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
 	if strings.HasPrefix(node.Val(), "golang.org") || strings.HasPrefix(node.Val(), "toolchain") {
-		if childLen > 0 {
+		if childLen > 0 && !hideSkipReason {
 			fmt.Printf(" <skipping %d children>\n", childLen)
 		} else {
 			fmt.Println()
