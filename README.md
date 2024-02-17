@@ -3,7 +3,8 @@
 This repo exists to create the simplest go program that will output your dependencies in a tree view.
 
 It will run `go mod graph` and send the output to `go-mod-graph.txt`. The output file will be processed
-and rendered as a tree view.
+and rendered as a tree view. The output also excludes dependencies from `golang.org`. There's no way to
+change this behavior at this time.
 
 There are three simple flags you can pass:
 * maxDepth - how deeply to recurse into the deps. defaults to max int
