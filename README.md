@@ -23,8 +23,9 @@ github.com/dovholuknf/go-deptree
 ```
 
 ## Installing
-To install execute:
+To install/update execute:
 ```
-GO111MODULE=off go get -d github.com/dovholuknf/go-deptree
+GO111MODULE=off go get -u github.com/dovholuknf/go-deptree
 go install github.com/dovholuknf/go-deptree@latest
+go-deptree -version
 ```
