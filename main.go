@@ -22,16 +22,24 @@ type Node struct {
 	Parent   string
 }
 
+func (n *Node) Val() string {
+	if includeVersion {
+		return n.Value
+	} else {
+		return strings.Split(n.Value, "@")[0]
+	}
+}
+
 func main() {
 	maxDepth := flag.Int("maxDepth", math.MaxInt, "Maximum depth for processing")
 	var versionFlag = false
 	flag.BoolVar(&versionFlag, "version", false, "Print the version")
 	flag.BoolVar(&verbose, "verbose", false, "Print additional output")
-	flag.BoolVar(&verbose, "includeVersion", false, "Prints the version of the dependency too")
+	flag.BoolVar(&includeVersion, "includeVersion", false, "Prints the version of the dependency too")
 	flag.Parse()
 
 	if versionFlag {
-		fmt.Println("1.0.2")
+		fmt.Println("1.0.3")
 		return
 	}
 
@@ -76,12 +84,7 @@ func processFile(filePath string, seedValue string) (*Node, error) {
 		}
 
 		parent := fields[0]
-		child := ""
-		if includeVersion {
-			child = fields[1]
-		} else {
-			child = strings.Split(fields[1], "@")[0]
-		}
+		child := fields[1]
 
 		// Create nodes if they don't exist
 		if _, ok := nodes[parent]; !ok {
@@ -114,16 +117,16 @@ func isChildLinked(parent *Node, child *Node) bool {
 }
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
-	done := rendered[node.Value]
+	done := rendered[node.Val()]
 	if done != "" {
-		fmt.Printf("%s%s%s <skipping -- previously rendered under node: %s>\n", childIndent, nodeIndent, node.Value, node.Parent)
+		fmt.Printf("%s%s%s <skipping -- previously rendered under node: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
 		return
 	}
-	rendered[node.Value] = node.Value
+	rendered[node.Val()] = node.Val()
 	childLen := len(node.Children)
 
-	fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Value)
-	if strings.HasPrefix(node.Value, "golang.org") {
+	fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
+	if strings.HasPrefix(node.Val(), "golang.org") || strings.HasPrefix(node.Val(), "toolchain") {
 		if childLen > 0 {
 			fmt.Printf(" <skipping %d children>\n", childLen)
 		} else {
@@ -141,7 +144,7 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 	}
 	if maxDepth >= depth {
 		sort.Slice(node.Children, func(i, j int) bool {
-			return caseInsensitiveCompare(node.Children[i].Value, node.Children[j].Value)
+			return caseInsensitiveCompare(node.Children[i].Val(), node.Children[j].Val())
 		})
 
 		for i, child := range node.Children {
