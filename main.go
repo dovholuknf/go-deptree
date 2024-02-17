@@ -70,11 +70,11 @@ func main() {
 		fmt.Printf("Processing with maxDepth: %d\n", depth)
 	}
 
-	goModFile := "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go.mod"
+	goModFile := "./go.mod"
 	processGoMod(goModFile)
 
 	executeGoModGraph()
-	filePath := "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go-mod-graph.txt"
+	filePath := "./go-mod-graph.txt"
 	seedNode, err := processFile(filePath) // getCurrentModuleName())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
@@ -86,8 +86,11 @@ func main() {
 	printNodeWithIndentation(depth, 1, seedNode, "", "", 1, 1)
 }
 
-func processFile(filePath string) (*Node, error) {
-	file, err := os.Open(filePath)
+func processFile(goModGraphFile string) (*Node, error) {
+	if verbose {
+		fmt.Println("Reading go mod graph file: " + goModGraphFile)
+	}
+	file, err := os.Open(goModGraphFile)
 	if err != nil {
 		return nil, err
 	}
@@ -234,6 +237,9 @@ func caseInsensitiveCompare(a, b string) bool {
 }
 
 func processGoMod(file string) {
+	if verbose {
+		fmt.Println("Opening go.mod: " + file)
+	}
 	f, err := os.Open(file)
 	if err != nil {
 		log.Fatalln(err)
