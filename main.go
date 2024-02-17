@@ -15,6 +15,7 @@ type Node struct {
 }
 
 func main() {
+	fmt.Println("Version 1")
 	// Define a maxDepth flag with a default value of 0
 	maxDepth := flag.Int("maxDepth", 1, "Maximum depth for processing")
 
