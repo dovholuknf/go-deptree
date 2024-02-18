@@ -15,7 +15,7 @@ There are a few flags you can pass:
 
 For example, running `go run main.go` on this project renders no dependencies other than go itself:
 
-````
+```
 $ go run main.go  -verbose -maxDepth=100
 Processing with maxDepth: 100
 Output of go mod graph written to: ./go-mod-graph.txt
@@ -30,5 +30,4 @@ To install/update execute:
 ```
 GO111MODULE=off go get -u github.com/dovholuknf/go-deptree
 go install github.com/dovholuknf/go-deptree@latest
-go-deptree -version
 ```
