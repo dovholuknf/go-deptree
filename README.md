@@ -13,21 +13,58 @@ There are a few flags you can pass:
 * includeVersion - adds the version of the dependency to the tree. defaults to false
 * hideSkipReason - suppresses the 'previously seen' and child dependency skip counts
 
-For example, running `go run main.go` on this project renders no dependencies other than go itself:
+For example, running `go run main.go` on this project renders one dependency on testify 
+just to see it in action (no tests exist yet):
 
 ```
-$ go run main.go  -verbose -maxDepth=100
-Processing with maxDepth: 100
-Output of go mod graph written to: ./go-mod-graph.txt
-
+$ go run main.go
 github.com/dovholuknf/go-deptree
-    └── go@1.21.5
-        └── toolchain@go1.21.5
+     ├─ github.com/stretchr/testify
+     │   ├─ github.com/davecgh/go-spew
+     │   ├─ github.com/pmezard/go-difflib
+     │   ├─ github.com/stretchr/objx
+     │   └─ gopkg.in/yaml.v3
+     │       └─ gopkg.in/check.v1
+     └─ go
+         └─ toolchain
 ```
 
 ## Installing
-To install/update execute:
+To install execute:
 ```
 GO111MODULE=off go get -u github.com/dovholuknf/go-deptree
 go install github.com/dovholuknf/go-deptree@latest
+```
+
+## Running
+### Defaults
+```
+$ go-deptree
+github.com/dovholuknf/go-deptree
+     ├─ github.com/stretchr/testify
+     │   ├─ github.com/davecgh/go-spew
+     │   ├─ github.com/pmezard/go-difflib
+     │   ├─ github.com/stretchr/objx
+     │   └─ gopkg.in/yaml.v3
+     │       └─ gopkg.in/check.v1
+     └─ go
+         └─ toolchain
+```
+
+### Max Depth
+```
+$ go-deptree -maxDepth=1
+Processing with maxDepth: 1
+github.com/dovholuknf/go-deptree
+     ├─ github.com/stretchr/testify
+     └─ go
+```
+
+### Include Version
+```
+$ go-deptree -maxDepth=1 -includeVersion
+Processing with maxDepth: 1
+github.com/dovholuknf/go-deptree
+     ├─ github.com/stretchr/testify@v1.8.4
+     └─ go@1.21.5
 ```
