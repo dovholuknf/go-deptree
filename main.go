@@ -162,9 +162,18 @@ func isChildLinked(parent *Node, child *Node) bool {
 }
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
+	nonGoDeps := make([]*Node, 0)
+	goDepCount := 0
+	for _, child := range node.Children {
+		if strings.HasPrefix(child.Val(), "golang.org") {
+			goDepCount++
+		} else {
+			nonGoDeps = append(nonGoDeps, child)
+		}
+	}
+
 	renderedNode := rendered[node.Val()]
 	alreadyRendered := renderedNode != ""
-	//msgFmt := "%s%s%s"
 	openingChar := ""
 	closingChar := ""
 	previouslySeen := ""
@@ -177,7 +186,7 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 	}
 
 	rendered[node.Val()] = node.Val()
-	childLen := len(node.Children)
+	childLen := len(nonGoDeps)
 
 	if childLen > 0 && alreadyRendered {
 		if childLen > 1 {
@@ -196,23 +205,12 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 	}
 
 	if maxDepth >= depth && renderedNode == "" {
-		sort.Slice(node.Children, func(i, j int) bool {
-			return caseInsensitiveCompare(node.Children[i].Val(), node.Children[j].Val())
+		sort.Slice(nonGoDeps, func(i, j int) bool {
+			return caseInsensitiveCompare(nonGoDeps[i].Val(), nonGoDeps[j].Val())
 		})
 
-		hasGolangDep := false
-		for i, child := range node.Children {
-			if strings.HasPrefix(child.Val(), "golang.org") {
-				hasGolangDep = true //make a note of golang dep and carry on
-				continue
-			}
-			if child.Val() == "github.com/tklauser/numcpus" {
-				println("XXXX")
-				println("XXXX")
-				println("XXXX")
-				println("XXXX")
-			}
-
+		hasGolangDep := goDepCount > 0
+		for i, child := range nonGoDeps {
 			finalNode := i >= childLen-1
 			if finalNode {
 				if !hasGolangDep {
@@ -225,10 +223,13 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 			}
 
 			if finalNode {
-				fmt.Printf("%s%s%s%s%s%s%s\n", childIndent, "└── ", "<skipped all golang.org* dependencies>", "", "", "", "")
-			} else {
-				printNodeWithIndentation(maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
+				if hasGolangDep {
+					nodeIndent = "└── "
+					fmt.Printf("%s%s<skipped all [%d] golang.org* dependencies>\n", childIndent, nodeIndent, goDepCount)
+					continue
+				}
 			}
+			printNodeWithIndentation(maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
 		}
 	}
 }
