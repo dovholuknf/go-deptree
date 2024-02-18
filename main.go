@@ -18,19 +18,14 @@ import (
 const ver = "1.0.9"
 
 func TestSomething(t *testing.T) {
-
-	// assert equality
 	assert.Equal(t, 123, 123, "they should be equal")
 }
 
 var verbose = false
 var includeVersion = false
-
-// var hideSkipReason = false
+var hideSkipReason = false
 var rendered = make(map[string]string)
 var directDeps = make(map[string]bool)
-
-//var indirectDeps = make(map[string]bool)
 
 type Node struct {
 	Value    string
@@ -51,11 +46,10 @@ func main() {
 	time.Sleep(time.Second)
 	maxDepth := flag.Int("maxDepth", math.MaxInt, "Maximum depth for processing")
 	var versionFlag = false
-	flag.BoolVar(&versionFlag, "version", false, "Print the version")
-	flag.BoolVar(&verbose, "verbose", false, "Print additional output")
-	//	flag.BoolVar(&hideSkipReason, "hideSkipReason", false, "Suppresses the reason for skipping child dependencies")
-
-	flag.BoolVar(&includeVersion, "includeVersion", false, "Prints the version of the dependency too")
+	flag.BoolVar(&versionFlag, "version", false, "Print the version and exits")
+	flag.BoolVar(&verbose, "verbose", false, "Print additional debug-type output")
+	flag.BoolVar(&includeVersion, "includeVersion", false, "Adds the version of the dependency to the output")
+	flag.BoolVar(&hideSkipReason, "hideSkipReason", false, "Suppresses the 'previously seen' and child dependency skip counts")
 	flag.Parse()
 
 	if versionFlag {
@@ -74,13 +68,11 @@ func main() {
 	}
 
 	goModFile := "./go.mod"
-	//goModFile = "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go.mod"
 	processGoMod(goModFile)
 
 	executeGoModGraph()
 	filePath := "./go-mod-graph.txt"
-	//filePath = "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go-mod-graph.txt"
-	seedNode, err := processFile(filePath) // getCurrentModuleName())
+	seedNode, err := processFile(filePath)
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
@@ -134,9 +126,7 @@ func processFile(goModGraphFile string) (*Node, error) {
 		if !isChildLinked(pn, cn) {
 			if pn == seedNode {
 				in := directDeps[cn.Value]
-				if in {
-					//nodes[parent].Children = append(pn.Children, cn)
-				} else {
+				if !in {
 					nodes[parent].Children = append(pn.Children, cn)
 				}
 			} else {
@@ -196,12 +186,16 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 		}
 	}
 
-	fmt.Printf("%s%s%s%s%s%s%s\n", childIndent, nodeIndent, node.Val(), openingChar, previouslySeen, chillen, closingChar)
+	if hideSkipReason {
+		fmt.Printf("%s%s%s\n", childIndent, nodeIndent, node.Val())
+	} else {
+		fmt.Printf("%s%s%s%s%s%s%s\n", childIndent, nodeIndent, node.Val(), openingChar, previouslySeen, chillen, closingChar)
+	}
 
 	if position == totalNodes {
 		childIndent += "    "
 	} else {
-		childIndent += "│   "
+		childIndent += " │  "
 	}
 
 	if maxDepth >= depth && renderedNode == "" {
@@ -214,17 +208,17 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 			finalNode := i >= childLen-1
 			if finalNode {
 				if !hasGolangDep {
-					nodeIndent = "└── "
+					nodeIndent = " └─ "
 				} else {
-					nodeIndent = "├── "
+					nodeIndent = " ├─ "
 				}
 			} else {
-				nodeIndent = "├── "
+				nodeIndent = " ├─ "
 			}
 
 			if finalNode {
 				if hasGolangDep {
-					nodeIndent = "└── "
+					nodeIndent = " └─ "
 					fmt.Printf("%s%s<skipped all [%d] golang.org* dependencies>\n", childIndent, nodeIndent, goDepCount)
 					continue
 				}

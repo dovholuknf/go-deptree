@@ -11,7 +11,7 @@ There are a few flags you can pass:
 * verbose - just a few extra lines of output
 * version - prints the version and exits
 * includeVersion - adds the version of the dependency to the tree. defaults to false
-* hideSkipReason - suppresses the reason child dependencies are not processed
+* hideSkipReason - suppresses the 'previously seen' and child dependency skip counts
 
 For example, running `go run main.go` on this project renders no dependencies other than go itself:
 
