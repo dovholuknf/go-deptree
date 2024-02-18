@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const ver = "1.0.7"
+const ver = "1.0.8"
 
 func TestSomething(t *testing.T) {
 
