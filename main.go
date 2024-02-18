@@ -4,96 +4,103 @@ import (
 	"bufio"
 	"flag"
 	"fmt"
+	"io"
 	"log"
 	"math"
 	"os"
 	"os/exec"
 	"sort"
 	"strings"
-	"testing"
 	"time"
-
-	"github.com/stretchr/testify/assert"
 )
 
 const ver = "1.0.9"
 
-func TestSomething(t *testing.T) {
-	assert.Equal(t, 123, 123, "they should be equal")
+type DepTreeOpts struct {
+	version        bool
+	verbose        bool
+	includeVersion bool
+	hideSkipReason bool
+	rendered       map[string]string
+	goModDeps      map[string]bool
+	goModFile      string
+	goModGraphFile string
+	writer         io.Writer
+	depth          int
 }
 
-var verbose = false
-var includeVersion = false
-var hideSkipReason = false
-var rendered = make(map[string]string)
-var directDeps = make(map[string]bool)
-
 type Node struct {
-	Value    string
-	Children []*Node
-	Parent   string
-	Indirect bool
+	Value          string
+	Children       []*Node
+	Parent         string
+	Indirect       bool
+	includeVersion bool
 }
 
 func (n *Node) Val() string {
-	if includeVersion {
+	if n.includeVersion {
 		return n.Value
 	} else {
 		return strings.Split(n.Value, "@")[0]
 	}
 }
 
-func main() {
-	time.Sleep(time.Second)
-	maxDepth := flag.Int("maxDepth", math.MaxInt, "Maximum depth for processing")
-	var versionFlag = false
-	flag.BoolVar(&versionFlag, "version", false, "Print the version and exits")
-	flag.BoolVar(&verbose, "verbose", false, "Print additional debug-type output")
-	flag.BoolVar(&includeVersion, "includeVersion", false, "Adds the version of the dependency to the output")
-	flag.BoolVar(&hideSkipReason, "hideSkipReason", false, "Suppresses the 'previously seen' and child dependency skip counts")
-	flag.Parse()
-
-	if versionFlag {
-		fmt.Println(ver)
-		return
+func NewDepTreeOpts() *DepTreeOpts {
+	return &DepTreeOpts{
+		rendered:       make(map[string]string),
+		goModDeps:      make(map[string]bool),
+		goModFile:      "./go.mod",
+		goModGraphFile: "./go-mod-graph.txt",
+		writer:         os.Stdout,
+		depth:          math.MaxInt,
 	}
-
-	depth := *maxDepth
-
-	if depth < 1 {
-		fmt.Println("maxDepth cannot be < 1, using 1 for maxDepth")
-		depth = 1
-	}
-	if depth < math.MaxInt || verbose {
-		fmt.Printf("Processing with maxDepth: %d\n", depth)
-	}
-
-	goModFile := "./go.mod"
-	processGoMod(goModFile)
-
-	executeGoModGraph()
-	filePath := "./go-mod-graph.txt"
-	seedNode, err := processFile(filePath)
-	if err != nil {
-		fmt.Printf("Error: %v\n", err)
-		return
-	}
-
-	printNodeWithIndentation(depth, 1, seedNode, "", "", 1, 1)
 }
 
-func processFile(goModGraphFile string) (*Node, error) {
-	if verbose {
-		fmt.Println("Reading go mod graph file: " + goModGraphFile)
+func main() {
+	time.Sleep(time.Second)
+	opts := NewDepTreeOpts()
+	maxDepth := flag.Int("maxDepth", math.MaxInt, "Maximum depth for processing")
+	flag.BoolVar(&opts.version, "version", false, "Print the version and exits")
+	flag.BoolVar(&opts.verbose, "verbose", false, "Print additional debug-type output")
+	flag.BoolVar(&opts.includeVersion, "includeVersion", false, "Adds the version of the dependency to the output")
+	flag.BoolVar(&opts.hideSkipReason, "hideSkipReason", false, "Suppresses the 'previously seen' and child dependency skip counts")
+	flag.Parse()
+	opts.depth = *maxDepth
+	process(opts)
+}
+
+func process(opts *DepTreeOpts) {
+	if opts.version {
+		_, _ = fmt.Fprintf(opts.writer, ver)
+		return
 	}
-	file, err := os.Open(goModGraphFile)
+
+	if opts.depth < 1 {
+		_, _ = fmt.Fprintf(opts.writer, "maxDepth cannot be < 1, using 1 for maxDepth")
+		opts.depth = 1
+	}
+	if opts.depth < math.MaxInt || opts.verbose {
+		_, _ = fmt.Fprintf(opts.writer, "Processing with maxDepth: %d\n", opts.depth)
+	}
+
+	opts.processGoMod()
+	opts.executeGoModGraph()
+	seedNode := opts.processFile()
+	printNodeWithIndentation(opts, opts.depth, 1, seedNode, "", "", 1, 1)
+}
+
+func (opts *DepTreeOpts) processFile() *Node {
+	if opts.verbose {
+		_, _ = fmt.Fprintf(opts.writer, "Reading go mod graph file: "+opts.goModGraphFile)
+	}
+	file, err := os.Open(opts.goModGraphFile)
 	if err != nil {
-		return nil, err
+		return nil
 	}
 	defer func() { _ = file.Close() }()
 
 	// Create the seed node
-	seedNode := &Node{}
+	seedNode := &Node{includeVersion: opts.includeVersion}
 
 	var nodes = make(map[string]*Node)
 	scanner := bufio.NewScanner(file)
@@ -102,7 +109,7 @@ func processFile(goModGraphFile string) (*Node, error) {
 		fields := strings.Fields(line)
 
 		if len(fields) != 2 {
-			return nil, fmt.Errorf("invalid line format: %s", line)
+			log.Fatalf("invalid line format: %s", line)
 		}
 
 		parent := fields[0]
@@ -115,10 +122,10 @@ func processFile(goModGraphFile string) (*Node, error) {
 
 		// Create nodes if they don't exist
 		if _, ok := nodes[parent]; !ok {
-			nodes[parent] = &Node{Value: parent}
+			nodes[parent] = &Node{Value: parent, includeVersion: opts.includeVersion}
 		}
 		if _, ok := nodes[child]; !ok {
-			nodes[child] = &Node{Value: child, Parent: nodes[parent].Val()}
+			nodes[child] = &Node{Value: child, Parent: nodes[parent].Val(), includeVersion: opts.includeVersion}
 		}
 
 		// Link child node to the parent only if it's not already linked
@@ -126,7 +133,7 @@ func processFile(goModGraphFile string) (*Node, error) {
 		cn := nodes[child]
 		if !isChildLinked(pn, cn) {
 			if pn == seedNode {
-				in := directDeps[cn.Value]
+				in := opts.goModDeps[cn.Value]
 				if !in {
 					nodes[parent].Children = append(pn.Children, cn)
 				}
@@ -137,10 +144,10 @@ func processFile(goModGraphFile string) (*Node, error) {
 	}
 
 	if err := scanner.Err(); err != nil {
-		return nil, err
+		log.Fatalf(err.Error())
 	}
 
-	return seedNode, nil
+	return seedNode
 }
 
 func isChildLinked(parent *Node, child *Node) bool {
@@ -152,7 +159,7 @@ func isChildLinked(parent *Node, child *Node) bool {
 	return false
 }
 
-func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
+func printNodeWithIndentation(opts *DepTreeOpts, maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
 	nonGoDeps := make([]*Node, 0)
 	goDepCount := 0
 	for _, child := range node.Children {
@@ -163,12 +170,12 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 		}
 	}
 
-	renderedNode := rendered[node.Val()]
+	renderedNode := opts.rendered[node.Val()]
 	alreadyRendered := renderedNode != ""
 	openingChar := ""
 	closingChar := ""
 	previouslySeen := ""
-	chillen := ""
+	childrenMsg := ""
 
 	if alreadyRendered {
 		openingChar = " <"
@@ -176,21 +183,21 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 		closingChar = ">"
 	}
 
-	rendered[node.Val()] = node.Val()
+	opts.rendered[node.Val()] = node.Val()
 	childLen := len(nonGoDeps)
 
 	if childLen > 0 && alreadyRendered {
 		if childLen > 1 {
-			chillen = fmt.Sprintf(" - skipping %d children", childLen)
+			childrenMsg = fmt.Sprintf(" - skipping %d children", childLen)
 		} else {
-			chillen = " - skipping 1 child"
+			childrenMsg = " - skipping 1 child"
 		}
 	}
 
-	if hideSkipReason {
-		fmt.Printf("%s%s%s\n", childIndent, nodeIndent, node.Val())
+	if opts.hideSkipReason {
+		_, _ = fmt.Fprintf(opts.writer, "%s%s%s\n", childIndent, nodeIndent, node.Val())
 	} else {
-		fmt.Printf("%s%s%s%s%s%s%s\n", childIndent, nodeIndent, node.Val(), openingChar, previouslySeen, chillen, closingChar)
+		_, _ = fmt.Fprintf(opts.writer, "%s%s%s%s%s%s%s\n", childIndent, nodeIndent, node.Val(), openingChar, previouslySeen, childrenMsg, closingChar)
 	}
 
 	if position == totalNodes {
@@ -220,23 +227,22 @@ func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, child
 			if finalNode {
 				if hasGolangDep {
 					nodeIndent = " └─ "
-					fmt.Printf("%s%s<skipped all [%d] golang.org* dependencies>\n", childIndent, nodeIndent, goDepCount)
+					_, _ = fmt.Fprintf(opts.writer, "%s%s<skipped all [%d] golang.org* dependencies>\n", childIndent, nodeIndent, goDepCount)
 					continue
 				}
 			}
-			printNodeWithIndentation(maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
+			printNodeWithIndentation(opts, maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
 		}
 	}
 }
-func executeGoModGraph() {
+func (opts *DepTreeOpts) executeGoModGraph() {
 	// Command to run: go mod graph
 	cmd := exec.Command("go", "mod", "graph")
 
 	// Create a file for writing the output
 	outputFile, err := os.Create("./go-mod-graph.txt")
 	if err != nil {
-		fmt.Println("Error creating output file:", err)
-		return
+		log.Fatalf(err.Error())
 	}
 	defer func() { _ = outputFile.Close() }()
 
@@ -246,12 +252,11 @@ func executeGoModGraph() {
 	// Run the command
 	err = cmd.Run()
 	if err != nil {
-		fmt.Println("Error running command:", err)
-		return
+		log.Fatalf(err.Error())
 	}
 
-	if verbose {
-		fmt.Printf("Output of go mod graph written to: ./go-mod-graph.txt\n\n")
+	if opts.verbose {
+		_, _ = fmt.Fprintf(opts.writer, "Output of go mod graph written to: ./go-mod-graph.txt\n\n")
 	}
 }
 
@@ -262,11 +267,11 @@ func caseInsensitiveCompare(a, b string) bool {
 	return aLower < bLower
 }
 
-func processGoMod(file string) {
-	if verbose {
-		fmt.Println("Opening go.mod: " + file)
+func (opts *DepTreeOpts) processGoMod() {
+	if opts.verbose {
+		_, _ = fmt.Fprintf(opts.writer, "Opening go.mod: "+opts.goModFile)
 	}
-	f, err := os.Open(file)
+	f, err := os.Open(opts.goModFile)
 	if err != nil {
 		log.Fatalln(err)
 	}
@@ -283,9 +288,9 @@ func processGoMod(file string) {
 
 		// Check if the line is an indirect dependency
 		if strings.Contains(line, "// indirect") {
-			directDeps[parts[0]+"@"+parts[1]] = true
+			opts.goModDeps[parts[0]+"@"+parts[1]] = true
 		} else {
-			directDeps[parts[0]+"@"+parts[1]] = false
+			opts.goModDeps[parts[0]+"@"+parts[1]] = false
 		}
 	}
 
