@@ -15,7 +15,7 @@ import (
 	"time"
 )
 
-const ver = "1.0.8"
+const ver = "1.0.9"
 
 func TestSomething(t *testing.T) {
 
@@ -25,7 +25,8 @@ func TestSomething(t *testing.T) {
 
 var verbose = false
 var includeVersion = false
-var hideSkipReason = false
+
+// var hideSkipReason = false
 var rendered = make(map[string]string)
 var directDeps = make(map[string]bool)
 
@@ -52,7 +53,7 @@ func main() {
 	var versionFlag = false
 	flag.BoolVar(&versionFlag, "version", false, "Print the version")
 	flag.BoolVar(&verbose, "verbose", false, "Print additional output")
-	flag.BoolVar(&hideSkipReason, "hideSkipReason", false, "Suppresses the reason for skipping child dependencies")
+	//	flag.BoolVar(&hideSkipReason, "hideSkipReason", false, "Suppresses the reason for skipping child dependencies")
 
 	flag.BoolVar(&includeVersion, "includeVersion", false, "Prints the version of the dependency too")
 	flag.Parse()
@@ -161,48 +162,73 @@ func isChildLinked(parent *Node, child *Node) bool {
 }
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
-	alreadyRendered := rendered[node.Val()]
-	if alreadyRendered != "" {
-		if !hideSkipReason {
-			fmt.Printf("%s%s%s <skipping -- already processed under: %s", childIndent, nodeIndent, node.Val(), node.Parent)
-		} else {
-			fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
-		}
-	} else {
-		fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
+	renderedNode := rendered[node.Val()]
+	alreadyRendered := renderedNode != ""
+	//msgFmt := "%s%s%s"
+	openingChar := ""
+	closingChar := ""
+	previouslySeen := ""
+	chillen := ""
+
+	if alreadyRendered {
+		openingChar = " <"
+		previouslySeen = "previously seen"
+		closingChar = ">"
 	}
 
 	rendered[node.Val()] = node.Val()
 	childLen := len(node.Children)
 
-	if strings.HasPrefix(node.Val(), "golang.org") || strings.HasPrefix(node.Val(), "toolchain") {
-		if childLen > 0 {
-			if !hideSkipReason {
-				fmt.Printf(" - skipping %d children>", childLen)
-			}
+	if childLen > 0 && alreadyRendered {
+		if childLen > 1 {
+			chillen = fmt.Sprintf(" - skipping %d children", childLen)
+		} else {
+			chillen = " - skipping 1 child"
 		}
-		fmt.Println()
-		return
 	}
-	fmt.Println()
+
+	fmt.Printf("%s%s%s%s%s%s%s\n", childIndent, nodeIndent, node.Val(), openingChar, previouslySeen, chillen, closingChar)
 
 	if position == totalNodes {
 		childIndent += "    "
 	} else {
 		childIndent += "│   "
 	}
-	if maxDepth >= depth && alreadyRendered == "" {
+
+	if maxDepth >= depth && renderedNode == "" {
 		sort.Slice(node.Children, func(i, j int) bool {
 			return caseInsensitiveCompare(node.Children[i].Val(), node.Children[j].Val())
 		})
 
+		hasGolangDep := false
 		for i, child := range node.Children {
-			if i >= childLen-1 {
-				nodeIndent = "└── "
+			if strings.HasPrefix(child.Val(), "golang.org") {
+				hasGolangDep = true //make a note of golang dep and carry on
+				continue
+			}
+			if child.Val() == "github.com/tklauser/numcpus" {
+				println("XXXX")
+				println("XXXX")
+				println("XXXX")
+				println("XXXX")
+			}
+
+			finalNode := i >= childLen-1
+			if finalNode {
+				if !hasGolangDep {
+					nodeIndent = "└── "
+				} else {
+					nodeIndent = "├── "
+				}
 			} else {
 				nodeIndent = "├── "
 			}
-			printNodeWithIndentation(maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
+
+			if finalNode {
+				fmt.Printf("%s%s%s%s%s%s%s\n", childIndent, "└── ", "<skipped all golang.org* dependencies>", "", "", "", "")
+			} else {
+				printNodeWithIndentation(maxDepth, depth+1, child, nodeIndent, childIndent, i+1, childLen)
+			}
 		}
 	}
 }
