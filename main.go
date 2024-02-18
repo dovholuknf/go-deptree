@@ -12,6 +12,7 @@ import (
 	"sort"
 	"strings"
 	"testing"
+	"time"
 )
 
 const ver = "1.0.7"
@@ -46,6 +47,7 @@ func (n *Node) Val() string {
 }
 
 func main() {
+	time.Sleep(time.Second)
 	maxDepth := flag.Int("maxDepth", math.MaxInt, "Maximum depth for processing")
 	var versionFlag = false
 	flag.BoolVar(&versionFlag, "version", false, "Print the version")
@@ -71,17 +73,17 @@ func main() {
 	}
 
 	goModFile := "./go.mod"
+	//goModFile = "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go.mod"
 	processGoMod(goModFile)
 
 	executeGoModGraph()
 	filePath := "./go-mod-graph.txt"
+	//filePath = "/home/cd/git/github/dovholuknf/edgex/go-mod-bootstrap/go-mod-graph.txt"
 	seedNode, err := processFile(filePath) // getCurrentModuleName())
 	if err != nil {
 		fmt.Printf("Error: %v\n", err)
 		return
 	}
-
-	fmt.Println(directDeps) //, indirectDeps)
 
 	printNodeWithIndentation(depth, 1, seedNode, "", "", 1, 1)
 }
@@ -159,41 +161,43 @@ func isChildLinked(parent *Node, child *Node) bool {
 }
 
 func printNodeWithIndentation(maxDepth, depth int, node *Node, nodeIndent, childIndent string, position int, totalNodes int) {
-	done := rendered[node.Val()]
-	if done != "" {
+	alreadyRendered := rendered[node.Val()]
+	if alreadyRendered != "" {
 		if !hideSkipReason {
-			fmt.Printf("%s%s%s <skipping -- already processed under: %s>\n", childIndent, nodeIndent, node.Val(), node.Parent)
+			fmt.Printf("%s%s%s <skipping -- already processed under: %s", childIndent, nodeIndent, node.Val(), node.Parent)
+		} else {
+			fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
 		}
-		return
+	} else {
+		fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
 	}
+
 	rendered[node.Val()] = node.Val()
 	childLen := len(node.Children)
 
-	fmt.Printf("%s%s%s", childIndent, nodeIndent, node.Val())
 	if strings.HasPrefix(node.Val(), "golang.org") || strings.HasPrefix(node.Val(), "toolchain") {
 		if childLen > 0 {
 			if !hideSkipReason {
-				fmt.Printf(" <skipping %d children>\n", childLen)
+				fmt.Printf(" - skipping %d children>", childLen)
 			}
 		}
 		fmt.Println()
 		return
-	} else {
-		fmt.Println()
 	}
+	fmt.Println()
 
 	if position == totalNodes {
 		childIndent += "    "
 	} else {
 		childIndent += "│   "
 	}
-	if maxDepth >= depth {
+	if maxDepth >= depth && alreadyRendered == "" {
 		sort.Slice(node.Children, func(i, j int) bool {
 			return caseInsensitiveCompare(node.Children[i].Val(), node.Children[j].Val())
 		})
 
 		for i, child := range node.Children {
-			if i == childLen-1 {
+			if i >= childLen-1 {
 				nodeIndent = "└── "
 			} else {
 				nodeIndent = "├── "
