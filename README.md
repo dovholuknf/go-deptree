@@ -13,18 +13,22 @@ There are a few flags you can pass:
 * includeVersion - adds the version of the dependency to the tree. defaults to false
 * hideSkipReason - suppresses the 'previously seen' and child dependency skip counts
 
-For example, running `go run main.go` on this project renders one dependency on testify 
-just to see it in action (no tests exist yet):
+For example, running `go run main.go` on this project renders one dependency on `testify` 
+and another dependency on `github.com/json-iterator/go` to demonstrate some dependencies.
 
 ```
 $ go run main.go
 github.com/dovholuknf/go-deptree
-     ├─ github.com/stretchr/testify
+     ├─ github.com/json-iterator/go
      │   ├─ github.com/davecgh/go-spew
-     │   ├─ github.com/pmezard/go-difflib
-     │   ├─ github.com/stretchr/objx
-     │   └─ gopkg.in/yaml.v3
-     │       └─ gopkg.in/check.v1
+     │   ├─ github.com/google/gofuzz
+     │   ├─ github.com/modern-go/concurrent
+     │   ├─ github.com/modern-go/reflect2
+     │   └─ github.com/stretchr/testify
+     │       ├─ github.com/davecgh/go-spew <previously seen>
+     │       ├─ github.com/pmezard/go-difflib
+     │       └─ github.com/stretchr/objx
+     ├─ github.com/stretchr/testify <previously seen - skipping 4 children>
      └─ go
          └─ toolchain
 ```
